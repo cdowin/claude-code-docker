@@ -3,12 +3,13 @@
 # Container runs detached — re-run this script to attach a new Claude session.
 #
 # Usage:
-#   ./run-claude.sh                        # starts/attaches session "default"
-#   ./run-claude.sh my-project             # starts/attaches session "my-project"
-#   ./run-claude.sh my-project --model opus  # session + claude args
-#   ./run-claude.sh list                   # show running sessions
-#   ./run-claude.sh stop my-project        # stop a session
-#   ./run-claude.sh stop-all               # stop all sessions
+#   ./run-claude.sh                                  # session "default", mounts $PWD
+#   ./run-claude.sh my-project                       # named session, mounts $PWD
+#   ./run-claude.sh my-project --work-dir ~/repo     # override workspace
+#   ./run-claude.sh my-project --model opus          # pass args to claude
+#   ./run-claude.sh list                             # show running sessions
+#   ./run-claude.sh stop my-project                  # stop a session
+#   ./run-claude.sh stop-all                         # stop all sessions
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -36,6 +37,23 @@ esac
 SESSION_NAME="${1:-default}"
 shift 2>/dev/null || true
 
+# ── Parse --work-dir flag ────────────────────────────────────────
+WORKSPACE_OVERRIDE=""
+CLAUDE_ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --work-dir)
+      WORKSPACE_OVERRIDE="$(cd "$2" && pwd)"
+      shift 2
+      ;;
+    *)
+      CLAUDE_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+
 CONF="$SCRIPT_DIR/claude-docker.conf"
 if [ ! -f "$CONF" ]; then
   echo "ERROR: No claude-docker.conf found."
@@ -51,9 +69,15 @@ SSH_METHOD="${SSH_METHOD:-key-file}"
 PLUGINS_METHOD="${PLUGINS_METHOD:-mount}"
 CLAUDE_DIR="$HOME/.claude"
 
-# ── Validate workspace ───────────────────────────────────────────
-if [ -z "${WORKSPACE_DIR:-}" ] || [ ! -d "$WORKSPACE_DIR" ]; then
-  echo "ERROR: WORKSPACE_DIR is not set or does not exist: ${WORKSPACE_DIR:-<unset>}"
+# ── Resolve workspace: override > conf > $PWD ────────────────────
+if [ -n "$WORKSPACE_OVERRIDE" ]; then
+  WORKSPACE_DIR="$WORKSPACE_OVERRIDE"
+elif [ -z "${WORKSPACE_DIR:-}" ]; then
+  WORKSPACE_DIR="$PWD"
+fi
+
+if [ ! -d "$WORKSPACE_DIR" ]; then
+  echo "ERROR: Workspace does not exist: $WORKSPACE_DIR"
   exit 1
 fi
 
@@ -186,6 +210,10 @@ CONTAINER_NAME="claude-${SESSION_NAME}"
 
 # ── Reconnect if container is already running ────────────────────
 if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+  if [ -n "$WORKSPACE_OVERRIDE" ]; then
+    echo "WARN: Container '$SESSION_NAME' is already running. Workspace override ignored."
+    echo "      Stop it first to change workspace: $0 stop $SESSION_NAME"
+  fi
   echo "Attaching to existing container '$SESSION_NAME'..."
   exec docker exec -it "$CONTAINER_NAME" gosu claude claude --dangerously-skip-permissions "$@"
 fi

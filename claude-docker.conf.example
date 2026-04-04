@@ -2,9 +2,11 @@
 # Copy this file to claude-docker.conf and edit to match your setup.
 
 # ── Workspace ────────────────────────────────────────────────────
-# Absolute path to the directory you want mounted as /workspace in the container.
-# This is where Claude Code will read and write files.
-WORKSPACE_DIR="/path/to/your/project"
+# Default directory to mount as /workspace in the container.
+# If unset, defaults to $PWD (wherever you run the script from).
+# Can always be overridden per-session:
+#   ./run-claude.sh my-project --work-dir ~/other/repo
+# WORKSPACE_DIR="/path/to/your/project"
 
 # ── Authentication ───────────────────────────────────────────────
 # How to provide Claude Code credentials. Pick ONE method:

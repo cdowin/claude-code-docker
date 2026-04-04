@@ -38,7 +38,7 @@ cd claude-code-docker
 
 # 2. Configure
 cp claude-docker.conf.example claude-docker.conf
-# Edit claude-docker.conf — set WORKSPACE_DIR and auth at minimum
+# Edit claude-docker.conf — set auth at minimum (workspace defaults to $PWD)
 
 # 3. Run
 ./run-claude.sh
@@ -49,12 +49,18 @@ This builds the image, starts a detached container, waits for setup (firewall, S
 ## Usage
 
 ```bash
-# Start or attach to the default session
+# Start in current directory (default session)
 ./run-claude.sh
 
-# Named sessions — one container per name
+# Named session — mounts $PWD as workspace
 ./run-claude.sh my-project
+
+# Override workspace directory
+./run-claude.sh my-project --work-dir ~/other/repo
+
+# Pass args to claude
 ./run-claude.sh my-project --model opus
+./run-claude.sh my-project --work-dir ~/other/repo --model opus
 
 # Multiple terminals on the same container
 # (each gets an independent Claude process, shared workspace)
