@@ -123,9 +123,16 @@ SSH_ARGS=()
 
 case "$SSH_METHOD" in
   key-file)
-    SSH_KEY_PATH="${SSH_KEY_PATH:?Set SSH_KEY_PATH in claude-docker.conf}"
-    if [ ! -f "$SSH_KEY_PATH" ]; then
-      echo "ERROR: SSH_KEY_PATH does not exist: $SSH_KEY_PATH"
+    if [ -z "${SSH_KEY_PATH:-}" ]; then
+      for key in "$HOME/.ssh/id_ed25519" "$HOME/.ssh/id_rsa" "$HOME/.ssh/id_ecdsa"; do
+        if [ -f "$key" ]; then
+          SSH_KEY_PATH="$key"
+          break
+        fi
+      done
+    fi
+    if [ -z "${SSH_KEY_PATH:-}" ] || [ ! -f "$SSH_KEY_PATH" ]; then
+      echo "ERROR: No SSH key found. Set SSH_KEY_PATH or use SSH_METHOD=none."
       exit 1
     fi
     SSH_ARGS+=(-v "$SSH_KEY_PATH:/home/claude/.ssh/user_key:ro")
