@@ -110,21 +110,40 @@ All configuration lives in `claude-docker.conf` (gitignored). See `claude-docker
 
 Your host `~/.claude/settings.json` is mounted into the container automatically. Any settings you configure locally apply inside Docker too.
 
-Some features worth enabling:
+See `settings.json.example` for recommended settings:
 
 ```json
 {
+  "alwaysThinkingEnabled": true,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh",
+    "padding": 0
+  },
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "SHIPYARD_TEAMS_ENABLED": "true"
   }
 }
 ```
 
 | Setting | What it does |
 |---------|-------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Enables [agent teams](https://code.claude.com/docs/en/agent-teams) — multiple Claude sessions coordinating via shared task list |
+| `alwaysThinkingEnabled` | Extended thinking on every response — better reasoning |
+| `statusLine` | Rich status bar showing context usage, cost, burn rate, git branch, session time |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | [Agent teams](https://code.claude.com/docs/en/agent-teams) — multiple Claude sessions coordinating via shared task list |
+| `SHIPYARD_TEAMS_ENABLED` | Enables team features in the [Shipyard](https://github.com/lgbarn/shipyard) plugin |
 
-See `settings.json.example` for a full example.
+### Status line
+
+A `statusline.sh` script is included that shows context remaining, cost tracking, tokens/minute, and session time. To use it:
+
+```bash
+cp statusline.sh ~/.claude/statusline.sh
+chmod +x ~/.claude/statusline.sh
+```
+
+Then add the `statusLine` block to your `~/.claude/settings.json` (see above). Requires `jq` for full functionality. Optionally install [ccusage](https://github.com/ryoppippi/ccusage) for session time tracking.
 
 ## How it works
 

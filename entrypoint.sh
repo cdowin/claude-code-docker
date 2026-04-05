@@ -59,8 +59,8 @@ case "$PLUGINS_METHOD" in
     if [ -d /mnt/host-plugins ]; then
       echo "Copying host plugins..."
       mkdir -p /home/claude/.claude/plugins
-      # Use rsync excluding .git dirs — cp -r fails on ro-mounted git packfiles
-      rsync -a --exclude='.git' /mnt/host-plugins/ /home/claude/.claude/plugins/
+      # Copy plugins preserving .git (plugin system needs it for marketplace validation)
+      rsync -a /mnt/host-plugins/ /home/claude/.claude/plugins/
       # Rewrite absolute host paths to container paths in all manifests
       for manifest in installed_plugins.json known_marketplaces.json; do
         target="/home/claude/.claude/plugins/$manifest"
