@@ -170,12 +170,6 @@ if [ -d "$CLAUDE_DIR" ]; then
   CLAUDE_STATE_ARGS+=(-v "$CLAUDE_DIR:/home/claude/.claude")
 fi
 
-# Mount .claude.json read-only — entrypoint copies it so container has its own
-CLAUDE_JSON_ARGS=()
-if [ -f "$HOME/.claude.json" ]; then
-  CLAUDE_JSON_ARGS+=(-v "$HOME/.claude.json:/mnt/host-claude.json:ro")
-fi
-
 # Mount credentials read-only — entrypoint copies so Claude can refresh tokens
 CRED_ARGS=()
 if [ -n "$CREDS_FILE" ]; then
@@ -206,7 +200,6 @@ docker run -d \
   "${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}" \
   "${SSH_ARGS[@]+"${SSH_ARGS[@]}"}" \
   "${CLAUDE_STATE_ARGS[@]+"${CLAUDE_STATE_ARGS[@]}"}" \
-  "${CLAUDE_JSON_ARGS[@]+"${CLAUDE_JSON_ARGS[@]}"}" \
   "${CRED_ARGS[@]+"${CRED_ARGS[@]}"}" \
   -v "$WORKSPACE_DIR:/workspace" \
   "$IMAGE_NAME"

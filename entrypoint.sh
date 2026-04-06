@@ -19,11 +19,11 @@ if [ -f /mnt/host-credentials.json ]; then
   chown claude:claude /home/claude/.claude/.credentials.json
 fi
 
-# Copy .claude.json so container has its own writable copy
-if [ -f /mnt/host-claude.json ]; then
-  sed 's/"installMethod":\s*"[^"]*"/"installMethod": "npm"/' /mnt/host-claude.json > /home/claude/.claude.json
-  chown claude:claude /home/claude/.claude.json
-fi
+# Generate minimal .claude.json to skip onboarding wizard
+# Claude Code requires this file with hasCompletedOnboarding to skip first-run setup
+echo '{"hasCompletedOnboarding":true,"installMethod":"native"}' > /home/claude/.claude/.claude.json
+ln -sf /home/claude/.claude/.claude.json /home/claude/.claude.json
+chown claude:claude /home/claude/.claude/.claude.json /home/claude/.claude.json
 
 # Set up SSH based on method passed via environment
 SSH_METHOD="${SSH_METHOD:-none}"
