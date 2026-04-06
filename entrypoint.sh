@@ -12,6 +12,12 @@ find /usr /bin /sbin -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || tru
 chown -R claude:claude /home/claude/.claude 2>/dev/null || true
 chown -R claude:claude /workspace 2>/dev/null || true
 
+# Copy .claude.json so container has its own writable copy (host file is ro)
+if [ -f /mnt/host-claude.json ]; then
+  cp /mnt/host-claude.json /home/claude/.claude.json
+  chown claude:claude /home/claude/.claude.json
+fi
+
 # Set up SSH based on method passed via environment
 SSH_METHOD="${SSH_METHOD:-none}"
 if [ "$SSH_METHOD" != "none" ]; then
