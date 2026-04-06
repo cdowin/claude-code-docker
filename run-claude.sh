@@ -171,11 +171,6 @@ if [ -d "$CLAUDE_DIR" ]; then
   CLAUDE_STATE_ARGS+=(-v "$CLAUDE_DIR:/home/claude/.claude")
 fi
 
-# Mount .claude.json if it exists (session state)
-SESSION_ARGS=()
-if [ -f "$HOME/.claude.json" ]; then
-  SESSION_ARGS+=(-v "$HOME/.claude.json:/home/claude/.claude.json")
-fi
 
 # ── Container name ───────────────────────────────────────────────
 CONTAINER_NAME="claude-${SESSION_NAME}"
@@ -201,7 +196,6 @@ docker run -d \
   "${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}" \
   "${SSH_ARGS[@]+"${SSH_ARGS[@]}"}" \
   "${CLAUDE_STATE_ARGS[@]+"${CLAUDE_STATE_ARGS[@]}"}" \
-  "${SESSION_ARGS[@]+"${SESSION_ARGS[@]}"}" \
   -v "$WORKSPACE_DIR:/workspace" \
   "$IMAGE_NAME"
 

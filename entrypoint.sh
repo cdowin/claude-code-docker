@@ -10,7 +10,6 @@ find /usr /bin /sbin -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || tru
 
 # Fix ownership on mounted directories so claude user can read/write them
 chown -R claude:claude /home/claude/.claude 2>/dev/null || true
-[ -f /home/claude/.claude.json ] && chown claude:claude /home/claude/.claude.json
 chown -R claude:claude /workspace 2>/dev/null || true
 
 # Set up SSH based on method passed via environment
