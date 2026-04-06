@@ -53,6 +53,12 @@ SSHEOF
   [ -f /home/claude/.ssh/id_key ] && chown claude:claude /home/claude/.ssh/id_key
 fi
 
+# Prime Claude Code with a headless call to complete first-run setup
+# Interactive mode shows an onboarding wizard; headless bypasses it and
+# writes the session state that marks setup as done.
+echo "Priming Claude Code session..."
+gosu claude claude -p "hello" --output-format json --max-turns 1 > /dev/null 2>&1 || true
+
 # Signal that setup is complete
 touch /tmp/.claude-ready
 
