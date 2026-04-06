@@ -12,8 +12,14 @@ find /usr /bin /sbin -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || tru
 chown -R claude:claude /home/claude/.claude 2>/dev/null || true
 chown -R claude:claude /workspace 2>/dev/null || true
 
-# Copy .claude.json so container has its own writable copy (host file is ro)
-# Override installMethod so Claude reads credentials from file, not keychain
+# Copy credentials extracted from host keychain (overwrites mounted version)
+if [ -f /mnt/host-credentials.json ]; then
+  cp /mnt/host-credentials.json /home/claude/.claude/.credentials.json
+  chmod 600 /home/claude/.claude/.credentials.json
+  chown claude:claude /home/claude/.claude/.credentials.json
+fi
+
+# Copy .claude.json so container has its own writable copy
 if [ -f /mnt/host-claude.json ]; then
   sed 's/"installMethod":\s*"[^"]*"/"installMethod": "npm"/' /mnt/host-claude.json > /home/claude/.claude.json
   chown claude:claude /home/claude/.claude.json
@@ -52,12 +58,6 @@ SSHEOF
   chown claude:claude /home/claude/.ssh /home/claude/.ssh/config
   [ -f /home/claude/.ssh/id_key ] && chown claude:claude /home/claude/.ssh/id_key
 fi
-
-# Prime Claude Code with a headless call to complete first-run setup
-# Interactive mode shows an onboarding wizard; headless bypasses it and
-# writes the session state that marks setup as done.
-echo "Priming Claude Code session..."
-gosu claude claude -p "hello" --output-format json --max-turns 1 > /dev/null 2>&1 || true
 
 # Signal that setup is complete
 touch /tmp/.claude-ready

@@ -94,8 +94,7 @@ case "$AUTH_METHOD" in
       echo "Make sure you're logged in via 'claude' on the host first."
       exit 1
     fi
-    mkdir -p "$CLAUDE_DIR"
-    CREDS_FILE="$CLAUDE_DIR/.credentials.json"
+    CREDS_FILE=$(mktemp)
     echo "$CREDS" > "$CREDS_FILE"
     chmod 600 "$CREDS_FILE"
     ;;
@@ -177,6 +176,12 @@ if [ -f "$HOME/.claude.json" ]; then
   CLAUDE_JSON_ARGS+=(-v "$HOME/.claude.json:/mnt/host-claude.json:ro")
 fi
 
+# Mount credentials read-only — entrypoint copies so Claude can refresh tokens
+CRED_ARGS=()
+if [ -n "$CREDS_FILE" ]; then
+  CRED_ARGS+=(-v "$CREDS_FILE:/mnt/host-credentials.json:ro")
+fi
+
 # ── Container name ───────────────────────────────────────────────
 CONTAINER_NAME="claude-${SESSION_NAME}"
 
@@ -201,7 +206,8 @@ docker run -d \
   "${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}" \
   "${SSH_ARGS[@]+"${SSH_ARGS[@]}"}" \
   "${CLAUDE_STATE_ARGS[@]+"${CLAUDE_STATE_ARGS[@]}"}" \
-  ${CLAUDE_JSON_ARGS[@]+"${CLAUDE_JSON_ARGS[@]}"} \
+  "${CLAUDE_JSON_ARGS[@]+"${CLAUDE_JSON_ARGS[@]}"}" \
+  "${CRED_ARGS[@]+"${CRED_ARGS[@]}"}" \
   -v "$WORKSPACE_DIR:/workspace" \
   "$IMAGE_NAME"
 
