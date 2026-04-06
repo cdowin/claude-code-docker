@@ -152,13 +152,15 @@ if [ "$HAS_JQ" -eq 1 ]; then
       (( context_used_pct < 0 )) && context_used_pct=0
       (( context_used_pct > 100 )) && context_used_pct=100
 
-      # Set color based on used percentage (green when low, red when high)
-      if [ "$context_used_pct" -ge 80 ]; then
-        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;203m'; fi; }  # coral red
-      elif [ "$context_used_pct" -ge 60 ]; then
-        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;215m'; fi; }  # peach
+      # Set color based on used percentage
+      if [ "$context_used_pct" -ge 70 ]; then
+        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;203m'; fi; }  # red
+      elif [ "$context_used_pct" -ge 50 ]; then
+        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;215m'; fi; }  # orange
+      elif [ "$context_used_pct" -ge 30 ]; then
+        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;228m'; fi; }  # yellow
       else
-        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;158m'; fi; }  # mint green
+        context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;158m'; fi; }  # green
       fi
 
       context_pct="${context_used_pct}%"
