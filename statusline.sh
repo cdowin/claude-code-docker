@@ -148,21 +148,20 @@ if [ "$HAS_JQ" -eq 1 ]; then
 
     if [ -n "$CURRENT_TOKENS" ] && [ "$CURRENT_TOKENS" -gt 0 ] 2>/dev/null; then
       context_used_pct=$(( CURRENT_TOKENS * 100 / CONTEXT_SIZE ))
-      context_remaining_pct=$(( 100 - context_used_pct ))
       # Clamp to valid range
-      (( context_remaining_pct < 0 )) && context_remaining_pct=0
-      (( context_remaining_pct > 100 )) && context_remaining_pct=100
+      (( context_used_pct < 0 )) && context_used_pct=0
+      (( context_used_pct > 100 )) && context_used_pct=100
 
-      # Set color based on remaining percentage
-      if [ "$context_remaining_pct" -le 20 ]; then
+      # Set color based on used percentage (green when low, red when high)
+      if [ "$context_used_pct" -ge 80 ]; then
         context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;203m'; fi; }  # coral red
-      elif [ "$context_remaining_pct" -le 40 ]; then
+      elif [ "$context_used_pct" -ge 60 ]; then
         context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;215m'; fi; }  # peach
       else
         context_color() { if [ "$use_color" -eq 1 ]; then printf '\033[38;5;158m'; fi; }  # mint green
       fi
 
-      context_pct="${context_remaining_pct}%"
+      context_pct="${context_used_pct}%"
     fi
   fi
 fi
@@ -313,8 +312,8 @@ fi
 # Line 2: Context and session time
 line2=""
 if [ -n "$context_pct" ]; then
-  context_bar=$(progress_bar "$context_remaining_pct" 10)
-  line2="🧠 $(context_color)Context Remaining: ${context_pct} [${context_bar}]$(rst)"
+  context_bar=$(progress_bar "$context_used_pct" 10)
+  line2="🧠 $(context_color)Context Used: ${context_pct} [${context_bar}]$(rst)"
 fi
 if [ -n "$session_txt" ]; then
   if [ -n "$line2" ]; then
@@ -324,40 +323,17 @@ if [ -n "$session_txt" ]; then
   fi
 fi
 if [ -z "$line2" ] && [ -z "$context_pct" ]; then
-  line2="🧠 $(context_color)Context Remaining: TBD$(rst)"
+  line2="🧠 $(context_color)Context Used: TBD$(rst)"
 fi
 
-# Line 3: Cost and usage analytics
+# Line 3: Token usage
 line3=""
-if [ -n "$cost_usd" ] && [[ "$cost_usd" =~ ^[0-9.]+$ ]]; then
-  if [ -n "$cost_per_hour" ] && [[ "$cost_per_hour" =~ ^[0-9.]+$ ]]; then
-    cost_per_hour_formatted=$(printf '%.2f' "$cost_per_hour")
-    line3="💰 $(cost_color)\$$(printf '%.2f' "$cost_usd")$(rst) ($(burn_color)\$${cost_per_hour_formatted}/h$(rst))"
-  else
-    line3="💰 $(cost_color)\$$(printf '%.2f' "$cost_usd")$(rst)"
-  fi
-fi
-if [ -n "$weekly_cost" ] && [[ "$weekly_cost" =~ ^[0-9.]+$ ]]; then
-  if [ -n "$line3" ]; then
-    line3="$line3  📅 $(cost_color)\$${weekly_cost}/wk$(rst)"
-  else
-    line3="📅 $(cost_color)\$${weekly_cost}/wk$(rst)"
-  fi
-fi
 if [ -n "$tot_tokens" ] && [[ "$tot_tokens" =~ ^[0-9]+$ ]]; then
   if [ -n "$tpm" ] && [[ "$tpm" =~ ^[0-9.]+$ ]]; then
     tpm_formatted=$(printf '%.0f' "$tpm")
-    if [ -n "$line3" ]; then
-      line3="$line3  📊 $(usage_color)${tot_tokens} tok (${tpm_formatted} tpm)$(rst)"
-    else
-      line3="📊 $(usage_color)${tot_tokens} tok (${tpm_formatted} tpm)$(rst)"
-    fi
+    line3="📊 $(usage_color)${tot_tokens} tok (${tpm_formatted} tpm)$(rst)"
   else
-    if [ -n "$line3" ]; then
-      line3="$line3  📊 $(usage_color)${tot_tokens} tok$(rst)"
-    else
-      line3="📊 $(usage_color)${tot_tokens} tok$(rst)"
-    fi
+    line3="📊 $(usage_color)${tot_tokens} tok$(rst)"
   fi
 fi
 
