@@ -1,6 +1,7 @@
 FROM node:22-slim
 
 ARG CLAUDE_CODE_VERSION=latest
+ARG HOST_UID=1000
 
 # Install tools Claude Code needs + firewall deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -16,8 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user — no sudo, no privilege escalation
-RUN useradd -m -s /bin/bash claude && \
+# Create non-root user matching host UID so mounted files are accessible
+RUN useradd -m -s /bin/bash -u ${HOST_UID} claude && \
   mkdir -p /home/claude/.claude /workspace && \
   chown -R claude:claude /home/claude /workspace
 

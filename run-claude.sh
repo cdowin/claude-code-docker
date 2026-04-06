@@ -161,7 +161,7 @@ if [ -n "${EXTRA_ALLOWED_DOMAINS:-}" ]; then
 fi
 
 # ── Build ────────────────────────────────────────────────────────
-docker build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
+docker build -t "$IMAGE_NAME" --build-arg HOST_UID="$(id -u)" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
 
 # ── Claude state mount ──────────────────────────────────────────
 # Mount the entire ~/.claude directory so all state carries over:
