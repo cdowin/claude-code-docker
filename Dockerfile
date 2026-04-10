@@ -2,7 +2,7 @@ FROM node:22-slim
 
 ARG CLAUDE_CODE_VERSION=latest
 
-# Install tools Claude Code needs + firewall deps
+# Install tools Claude Code needs + firewall deps + PDF generation
 RUN apt-get update && apt-get install -y --no-install-recommends \
   curl \
   git \
@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   dnsutils \
   gosu \
   python3 \
+  pandoc \
+  weasyprint \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user — entrypoint chowns mounted files at runtime
