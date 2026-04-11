@@ -305,10 +305,7 @@ if command -v ccusage >/dev/null 2>&1 && [ "$HAS_JQ" -eq 1 ]; then
         total=$(( end_sec - start_sec )); (( total<1 )) && total=1
         elapsed=$(( now_sec - start_sec )); (( elapsed<0 ))&&elapsed=0; (( elapsed>total ))&&elapsed=$total
         session_pct=$(( elapsed * 100 / total ))
-        remaining=$(( end_sec - now_sec )); (( remaining<0 )) && remaining=0
-        rh=$(( remaining / 3600 )); rm=$(( (remaining % 3600) / 60 ))
-        end_hm=$(fmt_time_hm "$end_sec")
-        session_txt="$(printf '%dh %dm until reset at %s (%d%%)' "$rh" "$rm" "$end_hm" "$session_pct")"
+        session_txt="${session_pct}%"
         session_bar=$(progress_bar "$session_pct" 10)
       fi
     fi
@@ -357,7 +354,7 @@ if [ -n "$output_style" ] && [ "$output_style" != "null" ]; then
   printf '  🎨 %s%s%s' "$(style_color)" "$output_style" "$(rst)"
 fi
 
-# Line 2: Context window
+# Line 2: Context + token expiry
 line2=""
 if [ -n "$context_pct" ]; then
   context_bar=$(progress_bar "$context_used_pct" 10)
@@ -365,31 +362,28 @@ if [ -n "$context_pct" ]; then
 else
   line2="🧠 $(context_color)Context Used: TBD$(rst)"
 fi
-
-# Line 3: Timers (token expiry + session reset)
-line3=""
 if [ -n "$token_txt" ]; then
-  line3="🔑 $(token_color)Token: ${token_txt}$(rst)"
+  line2="$line2  🔑 $(token_color)Auth: ${token_txt}$(rst)"
   if [ -n "$token_bar" ]; then
-    line3="$line3 $(token_color)[${token_bar}]$(rst)"
+    line2="$line2 $(token_color)[${token_bar}]$(rst)"
+  fi
+fi
+
+# Line 3: Token throughput + session reset
+line3=""
+if [ -n "$tot_tokens" ] && [[ "$tot_tokens" =~ ^[0-9]+$ ]]; then
+  if [ -n "$tpm" ] && [[ "$tpm" =~ ^[0-9.]+$ ]]; then
+    tpm_formatted=$(printf '%.0f' "$tpm")
+    line3="📊 $(usage_color)${tot_tokens} tok (${tpm_formatted} tpm)$(rst)"
+  else
+    line3="📊 $(usage_color)${tot_tokens} tok$(rst)"
   fi
 fi
 if [ -n "$session_txt" ]; then
   if [ -n "$line3" ]; then
-    line3="$line3  ⌛ $(session_color)${session_txt}$(rst) $(session_color)[${session_bar}]$(rst)"
+    line3="$line3  ⌛ $(session_color)Session Used: ${session_txt} [${session_bar}]$(rst)"
   else
-    line3="⌛ $(session_color)${session_txt}$(rst) $(session_color)[${session_bar}]$(rst)"
-  fi
-fi
-
-# Line 4: Token usage
-line4=""
-if [ -n "$tot_tokens" ] && [[ "$tot_tokens" =~ ^[0-9]+$ ]]; then
-  if [ -n "$tpm" ] && [[ "$tpm" =~ ^[0-9.]+$ ]]; then
-    tpm_formatted=$(printf '%.0f' "$tpm")
-    line4="📊 $(usage_color)${tot_tokens} tok (${tpm_formatted} tpm)$(rst)"
-  else
-    line4="📊 $(usage_color)${tot_tokens} tok$(rst)"
+    line3="⌛ $(session_color)Session Used: ${session_txt} [${session_bar}]$(rst)"
   fi
 fi
 
@@ -399,8 +393,5 @@ if [ -n "$line2" ]; then
 fi
 if [ -n "$line3" ]; then
   printf '\n%s' "$line3"
-fi
-if [ -n "$line4" ]; then
-  printf '\n%s' "$line4"
 fi
 printf '\n'
