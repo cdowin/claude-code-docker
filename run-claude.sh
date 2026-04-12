@@ -198,6 +198,8 @@ docker run -d \
   --cap-add=NET_ADMIN \
   --cap-add=NET_RAW \
   -e "HOST_HOME=$HOME" \
+  -e "TZ=$(cat /etc/timezone 2>/dev/null || readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||')" \
+  -v /etc/localtime:/etc/localtime:ro \
   "${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}" \
   "${SSH_ARGS[@]+"${SSH_ARGS[@]}"}" \
   "${CLAUDE_STATE_ARGS[@]+"${CLAUDE_STATE_ARGS[@]}"}" \
