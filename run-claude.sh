@@ -216,12 +216,12 @@ docker run -d \
 
 # Wait for setup (firewall, plugins) to finish
 echo "Container started. Waiting for setup..."
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   if docker exec "$CONTAINER_NAME" test -f /tmp/.claude-ready 2>/dev/null; then
     echo "Attaching..."
     exec docker exec -it "$CONTAINER_NAME" gosu claude claude --dangerously-skip-permissions "$@"
   fi
   sleep 1
 done
-echo "ERROR: Container setup did not complete within 30s. Check: docker logs $CONTAINER_NAME"
+echo "ERROR: Container setup did not complete within 60s. Check: docker logs $CONTAINER_NAME"
 exit 1
