@@ -159,8 +159,12 @@ if [ -n "${EXTRA_ALLOWED_DOMAINS:-}" ]; then
   EXTRA_ENV+=(-e "EXTRA_ALLOWED_DOMAINS=$EXTRA_ALLOWED_DOMAINS")
 fi
 
-# ── Build ────────────────────────────────────────────────────────
-docker build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
+# ── Build or Pull ────────────────────────────────────────────────
+if [[ "$IMAGE_NAME" == */* ]]; then
+  docker pull "$IMAGE_NAME"
+else
+  docker build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
+fi
 
 # ── Claude state mount ──────────────────────────────────────────
 # Mount the entire ~/.claude directory so all state carries over:
