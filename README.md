@@ -45,6 +45,20 @@ cp claude-docker.conf.example claude-docker.conf
 
 This builds the image, starts a detached container, waits for setup (firewall, SSH, plugins), then attaches an interactive Claude Code session.
 
+### Pre-built images
+
+Pre-built multi-arch images (amd64 + arm64) are published to GitHub Container Registry:
+
+```bash
+# Use the pre-built image instead of building locally
+./run-claude.sh --image ghcr.io/cdowin/claude-code-docker
+
+# Or set it as default in claude-docker.conf
+IMAGE_NAME="ghcr.io/cdowin/claude-code-docker"
+```
+
+When `IMAGE_NAME` points to a registry (contains `/`), the script pulls instead of building locally.
+
 ## Usage
 
 ```bash
@@ -56,6 +70,9 @@ This builds the image, starts a detached container, waits for setup (firewall, S
 
 # Override workspace directory
 ./run-claude.sh my-project --work-dir ~/other/repo
+
+# Use a different Docker image (e.g. a derived image with extra tools)
+./run-claude.sh my-project --image ghcr.io/cdowin/claude-code-godot-docker
 
 # Pass args to claude
 ./run-claude.sh my-project --model opus
@@ -142,7 +159,7 @@ Then add the `statusLine` block to your `~/.claude/settings.json` (see above). R
 ```
 run-claude.sh
 ├── Reads claude-docker.conf
-├── Builds image (Dockerfile)
+├── Builds image (Dockerfile) or pulls from registry
 ├── Starts detached container
 │   └── entrypoint.sh (runs as root)
 │       ├── init-firewall.sh — iptables allowlist (Anthropic API, GitHub, SSH)
@@ -159,6 +176,17 @@ run-claude.sh
 - **Non-root execution**: Claude Code runs as an unprivileged `claude` user. Entrypoint runs as root only for firewall setup, then drops privileges.
 - **No suid/sgid**: All suid/sgid bits stripped after firewall setup.
 - **Shared state**: `~/.claude` is mounted read-write so the container behaves as your host's Claude identity. SSH keys are mounted read-only.
+
+## Derived images
+
+This image is designed to be extended. Create a child Dockerfile for project-specific tooling:
+
+```dockerfile
+FROM ghcr.io/cdowin/claude-code-docker:latest
+RUN apt-get update && apt-get install -y your-tools
+```
+
+Then use `--image` to run it, or set `IMAGE_NAME` in your conf. See [claude-code-godot-docker](https://github.com/cdowin/claude-code-godot-docker) for an example that adds Godot game engine support.
 
 ## Requirements
 
