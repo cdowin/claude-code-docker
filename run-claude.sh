@@ -7,10 +7,20 @@
 #   ./run-claude.sh my-project                       # named session, mounts $PWD
 #   ./run-claude.sh my-project --work-dir ~/repo     # override workspace
 #   ./run-claude.sh my-project --model opus          # pass args to claude
-#   ./run-claude.sh my-project --image ghcr.io/...   # override docker image
+#   ./run-claude.sh my-project --image ghcr.io/...   # override docker image (namespaced → pull)
+#   ./run-claude.sh my-project --image claude-code-godot   # local image (see Image resolution below)
+#   ./run-claude.sh my-project --build               # force rebuild of local image
 #   ./run-claude.sh list                             # show running sessions
 #   ./run-claude.sh stop my-project                  # stop a session
 #   ./run-claude.sh stop-all                         # stop all sessions
+#
+# Image resolution for local (non-namespaced) image names:
+#   1. If the image already exists locally and --build was NOT passed, use it as-is.
+#   2. Otherwise, locate a Dockerfile by convention: sibling directory <image>-docker/
+#      (e.g. "claude-code-godot" → ../claude-code-godot-docker/Dockerfile), falling
+#      back to this script's own directory if its basename matches <image>-docker.
+#   3. If no matching Dockerfile is found, error out rather than silently rebuilding
+#      the wrong image (which would clobber the tag with unrelated contents).
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -38,8 +48,9 @@ esac
 SESSION_NAME="${1:-default}"
 shift 2>/dev/null || true
 
-# ── Parse --work-dir flag ────────────────────────────────────────
+# ── Parse --work-dir / --image / --build flags ───────────────────
 WORKSPACE_OVERRIDE=""
+FORCE_BUILD=0
 CLAUDE_ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -50,6 +61,10 @@ while [ $# -gt 0 ]; do
     --image)
       IMAGE_NAME="$2"
       shift 2
+      ;;
+    --build)
+      FORCE_BUILD=1
+      shift
       ;;
     *)
       CLAUDE_ARGS+=("$1")
@@ -165,10 +180,48 @@ if [ -n "${EXTRA_ALLOWED_DOMAINS:-}" ]; then
 fi
 
 # ── Build or Pull ────────────────────────────────────────────────
+# Namespaced images (contain "/") always come from a registry → pull.
+# Local tags: reuse if present, otherwise resolve a build context by naming
+# convention: <image>-docker/ as a sibling of this script's directory.
 if [[ "$IMAGE_NAME" == */* ]]; then
   docker pull "$IMAGE_NAME"
 else
-  docker build -t "$IMAGE_NAME" -f "$SCRIPT_DIR/Dockerfile" "$SCRIPT_DIR"
+  IMAGE_EXISTS=0
+  if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+    IMAGE_EXISTS=1
+  fi
+
+  if [ "$IMAGE_EXISTS" = 1 ] && [ "$FORCE_BUILD" = 0 ]; then
+    echo "Using existing local image '$IMAGE_NAME' (pass --build to rebuild)."
+  else
+    # Resolve build context. Prefer a sibling dir matching <image>-docker,
+    # fall back to $SCRIPT_DIR only when its basename matches.
+    BUILD_CONTEXT=""
+    SIBLING_DIR="$(cd "$SCRIPT_DIR/.." && pwd)/${IMAGE_NAME}-docker"
+    if [ -f "$SIBLING_DIR/Dockerfile" ]; then
+      BUILD_CONTEXT="$SIBLING_DIR"
+    elif [ "$(basename "$SCRIPT_DIR")" = "${IMAGE_NAME}-docker" ] && [ -f "$SCRIPT_DIR/Dockerfile" ]; then
+      BUILD_CONTEXT="$SCRIPT_DIR"
+    fi
+
+    if [ -z "$BUILD_CONTEXT" ]; then
+      if [ "$IMAGE_EXISTS" = 1 ]; then
+        echo "WARN: --build requested but no Dockerfile found for '$IMAGE_NAME'."
+        echo "      Looked for: $SIBLING_DIR/Dockerfile"
+        echo "      Using existing local image as-is."
+      else
+        echo "ERROR: No local image '$IMAGE_NAME' and no Dockerfile to build it from."
+        echo "       Expected one of:"
+        echo "         $SIBLING_DIR/Dockerfile"
+        echo "         $SCRIPT_DIR/Dockerfile (only if SCRIPT_DIR basename is '${IMAGE_NAME}-docker')"
+        echo "       Either pull a namespaced image (--image ghcr.io/…) or create the Dockerfile."
+        exit 1
+      fi
+    else
+      echo "Building '$IMAGE_NAME' from $BUILD_CONTEXT/Dockerfile..."
+      docker build -t "$IMAGE_NAME" -f "$BUILD_CONTEXT/Dockerfile" "$BUILD_CONTEXT"
+    fi
+  fi
 fi
 
 # ── Claude state mount ──────────────────────────────────────────
