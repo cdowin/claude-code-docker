@@ -48,11 +48,14 @@ iptables -A INPUT -p tcp --sport 22 -m state --state ESTABLISHED -j ACCEPT
 # GitHub: git operations + API + CDN domains for third-party plugin marketplaces
 # Feature flags: cdn.growthbook.io (controls plugin fallback behavior)
 # Plugin deps: npm registry, PyPI for plugins that install dependencies
+# Atlassian: api.atlassian.com for MCP/API access (instance-specific *.atlassian.net
+# subdomains must be added via EXTRA_ALLOWED_DOMAINS since they can't be wildcarded here)
 DOMAINS="
   api.anthropic.com claude.ai platform.claude.com statsig.anthropic.com sentry.io
   downloads.claude.ai storage.googleapis.com cdn.growthbook.io
   github.com api.github.com raw.githubusercontent.com objects.githubusercontent.com codeload.github.com
   registry.npmjs.org pypi.org files.pythonhosted.org
+  api.atlassian.com atlassian.net
 "
 if [ -n "${EXTRA_ALLOWED_DOMAINS:-}" ]; then
     DOMAINS="$DOMAINS $EXTRA_ALLOWED_DOMAINS"

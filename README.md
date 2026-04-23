@@ -172,7 +172,7 @@ run-claude.sh
 
 ### Security
 
-- **Network firewall**: Only Anthropic API, GitHub, plugin marketplace (downloads.claude.ai), and SSH traffic allowed. Everything else is rejected at the iptables level. Add more domains via `EXTRA_ALLOWED_DOMAINS`.
+- **Network firewall**: Only Anthropic API, GitHub, plugin marketplace (downloads.claude.ai), and SSH traffic allowed. Everything else is rejected at the iptables level. Add more domains via `EXTRA_ALLOWED_DOMAINS` — e.g. for the Atlassian MCP, add your instance: `EXTRA_ALLOWED_DOMAINS="yourorg.atlassian.net"` (the base `api.atlassian.com` and `atlassian.net` apex are already allowed, but `*.atlassian.net` subdomains can't be wildcarded and must be listed individually).
 - **Non-root execution**: Claude Code runs as an unprivileged `claude` user. Entrypoint runs as root only for firewall setup, then drops privileges.
 - **No suid/sgid**: All suid/sgid bits stripped after firewall setup.
 - **Shared state**: `~/.claude` is mounted read-write so the container behaves as your host's Claude identity. SSH keys are mounted read-only.
