@@ -46,6 +46,27 @@ SSH_KEY_PATH="$HOME/.ssh/id_ed25519"
 #   Use HTTPS for git instead. Claude won't be able to push over SSH.
 # SSH_METHOD="none"
 
+# ── Plugins ──────────────────────────────────────────────────────
+# Plugins live in a per-container Docker volume (claude-plugins-linux),
+# isolated from the host's ~/.claude/plugins so Linux-native binaries and
+# container-relative installPaths don't collide with the host's. The volume
+# starts empty, so define the plugin set here; the entrypoint installs it on
+# startup. Idempotent — already-installed plugins are skipped, so this only
+# does real work on the first run (or when you add an entry).
+#
+# SOURCE RULE: only GitHub marketplaces are officially supported, because the
+# firewall (init-firewall.sh) allowlists GitHub by default. To use any other
+# source (GitLab, a private host, a raw URL), you must add its domains to
+# EXTRA_ALLOWED_DOMAINS below AND adjust init-firewall.sh accordingly —
+# otherwise the install will hang/fail on a blocked connection.
+#
+# PLUGIN_MARKETPLACES: space-separated GitHub repos (owner/repo) to register.
+# PLUGINS: space-separated <plugin>@<marketplace> entries to install. The
+#   <marketplace> is the marketplace's declared name (e.g. anthropics/
+#   claude-plugins-official declares the name "claude-plugins-official").
+# PLUGIN_MARKETPLACES="anthropics/claude-plugins-official"
+# PLUGINS="superpowers@claude-plugins-official skill-creator@claude-plugins-official"
+
 # ── Optional ─────────────────────────────────────────────────────
 # Extra domains to allowlist in the firewall (space-separated).
 # GitHub and Anthropic services are always allowed.

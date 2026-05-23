@@ -12,7 +12,7 @@ The official devcontainer is designed for IDE integration. If you want to:
 - Keep the container **alive between sessions** so setup (firewall, plugins, SSH) only happens once
 - **Attach and detach** from your terminal without losing the container
 - Run **multiple named sessions** side by side (one per project, or multiple per project)
-- Forward **SSH keys** and **plugins/skills** from your host without manual setup
+- Forward **SSH keys** from your host and reproduce your **plugins/skills** from a declarative list
 
 ...then this is for you.
 
@@ -27,7 +27,7 @@ The official devcontainer is designed for IDE integration. If you want to:
 | **Multiple sessions** | One per window | Named sessions, run in parallel |
 | **Auth** | Manual setup | Keychain / credential file / API key |
 | **SSH** | Manual setup | Key file / agent forwarding / none |
-| **Plugins** | Manual install | Shared via `~/.claude` mount |
+| **Plugins** | Manual install | Declared in conf, auto-installed into an isolated volume |
 
 ## Quick start
 
@@ -117,7 +117,9 @@ All configuration lives in `claude-docker.conf` (gitignored). See `claude-docker
 
 ### Claude state
 
-Your entire `~/.claude` directory is mounted read-write into the container. This means the container shares your host's identity — settings, credentials, plugins, onboarding state, session history all carry over. No separate setup needed.
+Your `~/.claude` directory is mounted read-write into the container, so it shares your host's identity — `settings.json`, user memory (`CLAUDE.md`/`MEMORY.md`), custom slash commands, credentials, onboarding state, and session history (`projects/`) all carry over. The container *feels* like your local Claude.
+
+The **one exception is `plugins/`** (see below), which is deliberately isolated. Everything else is shared, so no separate setup is needed.
 
 See `settings.json.example` for recommended settings:
 
@@ -143,6 +145,31 @@ See `settings.json.example` for recommended settings:
 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | [Agent teams](https://code.claude.com/docs/en/agent-teams) — multiple Claude sessions coordinating via shared task list |
 | `SHIPYARD_TEAMS_ENABLED` | Enables team features in the [Shipyard](https://github.com/lgbarn/shipyard) plugin |
 
+### Plugins
+
+Unlike the rest of `~/.claude`, plugins are **not** shared from the host. They live in a per-container Docker volume (`claude-plugins-linux`) mounted over `~/.claude/plugins`. Two reasons make sharing impossible:
+
+- **Native binaries are OS-specific.** Plugins ship compiled `.node` modules (e.g. context-mode's `better_sqlite3`). The host is macOS; the container is Linux. A shared cache can only satisfy one ABI at a time — the other fails to load.
+- **`installPath`s are absolute and `$HOME`-relative.** The host's `$HOME` is `/Users/<you>`; the container's is `/home/claude`. A shared `installed_plugins.json` records paths valid for only one of them, breaking the other on every install/update.
+
+So the container keeps its own Linux-native, container-pathed plugin store. Define the set declaratively in `claude-docker.conf`; the entrypoint installs it on startup (idempotent — already-installed plugins are skipped, so only the first run does real work):
+
+```bash
+# Space-separated GitHub repos (owner/repo) to register as marketplaces
+PLUGIN_MARKETPLACES="anthropics/claude-plugins-official lgbarn/shipyard mksglu/context-mode"
+
+# Space-separated <plugin>@<marketplace> entries to install. <marketplace> is
+# the marketplace's *declared* name (anthropics/claude-plugins-official declares
+# the name "claude-plugins-official", lgbarn/shipyard declares "shipyard", etc.)
+PLUGINS="superpowers@claude-plugins-official shipyard@shipyard context-mode@context-mode"
+```
+
+List the same plugins you run on the host and the container gains the same capabilities — only the binaries are physically separate. Enable/disable state is also tracked per-container (in the volume's `installed_plugins.json`), which is what you want across platforms.
+
+> **Source rule: GitHub only.** The firewall (`init-firewall.sh`) allowlists GitHub by default, so only GitHub marketplaces work out of the box. To use any other source (GitLab, a private host, a raw URL) you must add its domains to `EXTRA_ALLOWED_DOMAINS` **and** adjust `init-firewall.sh` — otherwise the install hangs on a blocked connection.
+
+The volume persists across container restarts and rebuilds. To rebuild the plugin set from scratch, remove it: `docker volume rm claude-plugins-linux` (the next run reinstalls from your conf).
+
 ### Status line
 
 A `statusline.sh` script is included that shows context usage, auth token expiry, rate limit usage (5-hour window), and token throughput. To use it:
@@ -164,6 +191,8 @@ run-claude.sh
 │   └── entrypoint.sh (runs as root)
 │       ├── init-firewall.sh — iptables allowlist (Anthropic API, GitHub, SSH)
 │       ├── Strip suid/sgid bits
+│       ├── Inject credentials (keychain → .credentials.json)
+│       ├── Bootstrap plugins into the isolated volume (first run only)
 │       ├── Configure SSH keys
 │       ├── Touch /tmp/.claude-ready
 │       └── sleep infinity (keeps container alive)
@@ -172,10 +201,10 @@ run-claude.sh
 
 ### Security
 
-- **Network firewall**: Only Anthropic API, GitHub, plugin marketplace (downloads.claude.ai), and SSH traffic allowed. Everything else is rejected at the iptables level. Add more domains via `EXTRA_ALLOWED_DOMAINS` — e.g. for the Atlassian MCP, add your instance: `EXTRA_ALLOWED_DOMAINS="yourorg.atlassian.net"` (the base `api.atlassian.com` and `atlassian.net` apex are already allowed, but `*.atlassian.net` subdomains can't be wildcarded and must be listed individually).
+- **Network firewall**: Only Anthropic API, GitHub (git + plugin marketplaces), Claude Code self-update (downloads.claude.ai), and SSH traffic allowed. Everything else is rejected at the iptables level. This is also why plugin marketplaces must be GitHub-hosted by default (see [Plugins](#plugins)). Add more domains via `EXTRA_ALLOWED_DOMAINS` — e.g. for the Atlassian MCP, add your instance: `EXTRA_ALLOWED_DOMAINS="yourorg.atlassian.net"` (the base `api.atlassian.com` and `atlassian.net` apex are already allowed, but `*.atlassian.net` subdomains can't be wildcarded and must be listed individually).
 - **Non-root execution**: Claude Code runs as an unprivileged `claude` user. Entrypoint runs as root only for firewall setup, then drops privileges.
 - **No suid/sgid**: All suid/sgid bits stripped after firewall setup.
-- **Shared state**: `~/.claude` is mounted read-write so the container behaves as your host's Claude identity. SSH keys are mounted read-only.
+- **Shared state**: `~/.claude` is mounted read-write so the container behaves as your host's Claude identity (settings, memory, history). Plugins are the exception — isolated in a per-container volume (see [Plugins](#plugins)) because native binaries and `installPath`s are platform-specific. SSH keys are mounted read-only.
 
 ## Derived images
 

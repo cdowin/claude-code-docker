@@ -179,6 +179,15 @@ if [ -n "${EXTRA_ALLOWED_DOMAINS:-}" ]; then
   EXTRA_ENV+=(-e "EXTRA_ALLOWED_DOMAINS=$EXTRA_ALLOWED_DOMAINS")
 fi
 
+# ── Pass plugin bootstrap config to entrypoint ───────────────────
+# Entrypoint installs these into the isolated plugin volume on startup.
+if [ -n "${PLUGIN_MARKETPLACES:-}" ]; then
+  EXTRA_ENV+=(-e "PLUGIN_MARKETPLACES=$PLUGIN_MARKETPLACES")
+fi
+if [ -n "${PLUGINS:-}" ]; then
+  EXTRA_ENV+=(-e "PLUGINS=$PLUGINS")
+fi
+
 # ── Build or Pull ────────────────────────────────────────────────
 # Namespaced images (contain "/") always come from a registry → pull.
 # Local tags: reuse if present, otherwise resolve a build context by naming
@@ -232,6 +241,16 @@ if [ -d "$CLAUDE_DIR" ]; then
   CLAUDE_STATE_ARGS+=(-v "$CLAUDE_DIR:/home/claude/.claude")
 fi
 
+# Isolate plugins from the host. The plugin cache stores OS-specific native
+# binaries (e.g. context-mode's better_sqlite3 .node) AND absolute installPaths
+# tied to $HOME. The host is macOS-arm64 with $HOME=/Users/...; this container is
+# Linux with $HOME=/home/claude — so a shared plugins/ dir corrupts both on every
+# install/update. A named volume shadows the host's plugins/, giving the container
+# its own Linux-native, container-pathed plugin store that persists across runs.
+# Everything else under ~/.claude (auth, history, settings) still shares via the
+# bind mount above. Install plugins once inside the container; they stick here.
+PLUGIN_VOL_ARGS=(-v "claude-plugins-linux:/home/claude/.claude/plugins")
+
 # Mount credentials read-only — entrypoint copies so Claude can refresh tokens
 CRED_ARGS=()
 if [ -n "$CREDS_FILE" ]; then
@@ -274,19 +293,22 @@ docker run -d \
   "${EXTRA_ENV[@]+"${EXTRA_ENV[@]}"}" \
   "${SSH_ARGS[@]+"${SSH_ARGS[@]}"}" \
   "${CLAUDE_STATE_ARGS[@]+"${CLAUDE_STATE_ARGS[@]}"}" \
+  "${PLUGIN_VOL_ARGS[@]+"${PLUGIN_VOL_ARGS[@]}"}" \
   "${CRED_ARGS[@]+"${CRED_ARGS[@]}"}" \
   "${GH_ARGS[@]+"${GH_ARGS[@]}"}" \
   -v "$WORKSPACE_DIR:/workspace" \
   "$IMAGE_NAME"
 
-# Wait for setup (firewall, plugins) to finish
-echo "Container started. Waiting for setup..."
-for i in $(seq 1 60); do
+# Wait for setup (firewall, plugin bootstrap) to finish. First run installs
+# plugins into an empty volume (clones marketplaces from GitHub), which can take
+# a couple minutes; later runs are fast. Follow progress: docker logs -f $CONTAINER_NAME
+echo "Container started. Waiting for setup (first run installs plugins, may take a minute)..."
+for i in $(seq 1 180); do
   if docker exec "$CONTAINER_NAME" test -f /tmp/.claude-ready 2>/dev/null; then
     echo "Attaching..."
     exec docker exec -it "$CONTAINER_NAME" gosu claude claude --dangerously-skip-permissions "$@"
   fi
   sleep 1
 done
-echo "ERROR: Container setup did not complete within 60s. Check: docker logs $CONTAINER_NAME"
+echo "ERROR: Container setup did not complete within 180s. Check: docker logs $CONTAINER_NAME"
 exit 1
