@@ -66,6 +66,19 @@ if [ -n "${PLUGINS:-}" ]; then
   echo "Plugin bootstrap done."
 fi
 
+# ── Claude Code self-update ──────────────────────────────────────
+# Pull the latest CLI on every start so newer model defaults (e.g. Opus 4.8)
+# are picked up without rebuilding the image. Runs as the claude user — the
+# binary lives in /home/claude/.local/bin and self-updates there. Needs the
+# firewall up (claude.ai allowlisted, done above) and network reachable.
+# Non-fatal: a transient failure must not block container startup (set -e).
+echo "Updating Claude Code..."
+if run_as_claude claude update; then
+  echo "Claude Code: $(run_as_claude claude --version 2>/dev/null || echo unknown)"
+else
+  echo "Claude Code update skipped (offline or unreachable) — using bundled version."
+fi
+
 # Set up SSH based on method passed via environment
 SSH_METHOD="${SSH_METHOD:-none}"
 if [ "$SSH_METHOD" != "none" ]; then
