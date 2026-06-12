@@ -1,6 +1,6 @@
 FROM node:22-slim
 
-# Install tools Claude Code needs + firewall deps + PDF generation
+# Install tools Claude Code needs + firewall deps + PDF generation + browser rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   curl \
@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   gosu \
   procps \
   python3 \
+  python3-pip \
   pandoc \
   weasyprint \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -29,6 +30,20 @@ RUN useradd -m -s /bin/bash claude && \
   mkdir -p /home/claude/.claude /workspace && \
   chown -R claude:claude /home/claude /workspace
 
+# Headless Chromium for visual verification (HTML→PNG screenshots). Baked in at
+# build time because the running session has no root and a locked firewall (the
+# Playwright/Chrome download CDNs are blocked), so it cannot fetch a browser
+# later — only what ships in the image is usable offline. Two steps because the
+# pieces have different owners: the system libraries (libnss3/libgbm/fonts/…)
+# need root via apt, while the browser binary must be installed AS claude so its
+# cache lands in /home/claude/.cache/ms-playwright — that home is not a mount, so
+# it persists into the session and is owned by the user that runs it.
+RUN pip3 install --no-cache-dir --break-system-packages playwright \
+  && apt-get update \
+  && python3 -m playwright install-deps chromium \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN su - claude -c "python3 -m playwright install chromium"
+
 # ccusage (usage tracker) still ships via npm
 ENV DEVCONTAINER=true
 RUN npm install -g ccusage
@@ -41,10 +56,11 @@ ARG CACHEBUST=1
 ENV PATH=/home/claude/.local/bin:$PATH
 RUN su - claude -c "curl -fsSL https://claude.ai/install.sh | bash"
 
-# Copy firewall + entrypoint scripts (root-owned, not writable by claude)
+# Copy firewall + entrypoint + helper scripts (root-owned, not writable by claude)
 COPY init-firewall.sh /usr/local/bin/
 COPY entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/init-firewall.sh /usr/local/bin/entrypoint.sh
+COPY render-html /usr/local/bin/
+RUN chmod +x /usr/local/bin/init-firewall.sh /usr/local/bin/entrypoint.sh /usr/local/bin/render-html
 
 WORKDIR /workspace
 
